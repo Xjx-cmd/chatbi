@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>ChatBI 课程大纲</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 16mm 18mm 16mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Microsoft YaHei", "Noto Sans SC", SimHei, sans-serif;
+      color: #1f2937;
+      line-height: 1.65;
+      font-size: 11.5pt;
+      margin: 0;
+    }
+    .cover {
+      border-bottom: 3px solid #1d4ed8;
+      padding-bottom: 14px;
+      margin-bottom: 22px;
+    }
+    .kicker {
+      color: #1d4ed8;
+      font-size: 10pt;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+    h1 {
+      font-size: 26pt;
+      margin: 0 0 8px;
+      color: #111827;
+    }
+    .meta {
+      color: #6b7280;
+      font-size: 9.5pt;
+      margin: 0;
+    }
+    .lead {
+      background: #eff6ff;
+      border-left: 4px solid #1d4ed8;
+      padding: 12px 14px;
+      margin: 0 0 22px;
+    }
+    .lead h2 {
+      font-size: 12.5pt;
+      margin: 0 0 6px;
+      color: #1e3a8a;
+    }
+    .lead p { margin: 0; }
+    h2.stage {
+      font-size: 13.5pt;
+      color: #fff;
+      background: #1d4ed8;
+      padding: 8px 12px;
+      margin: 20px 0 10px;
+      border-radius: 4px;
+      page-break-after: avoid;
+    }
+    .lesson {
+      page-break-inside: avoid;
+      padding: 8px 4px 8px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .lesson h3 {
+      font-size: 11.5pt;
+      margin: 0 0 4px;
+      color: #111827;
+    }
+    .lesson p {
+      margin: 0;
+      color: #4b5563;
+      font-size: 10.5pt;
+    }
+    .summary {
+      margin-top: 24px;
+      border: 1px solid #bfdbfe;
+      background: #f8fafc;
+      padding: 12px 14px;
+      page-break-inside: avoid;
+    }
+    .summary h2 {
+      font-size: 12.5pt;
+      margin: 0 0 8px;
+      color: #1e3a8a;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+    }
+    th, td {
+      border: 1px solid #dbeafe;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    th { background: #dbeafe; }
+    .footer {
+      margin-top: 18px;
+      color: #9ca3af;
+      font-size: 9pt;
+    }
+  </style>
+</head>
+<body>
+  <header class="cover">
+    <p class="kicker">CHATBI LEARNING OUTLINE</p>
+    <h1>ChatBI 课程大纲</h1>
+    <p class="meta">来源：飞书 Wiki · 智优未来 · 文档更新于 2025-07-02 · 共 6 个阶段 / 30 课时</p>
+  </header>
+
+  <section class="lead">
+    <h2>课程主线</h2>
+    <p>本系列课程围绕一个真实企业级 ChatBI 实战项目，从 0 到 1 逐步推进，每一节解决一个具体问题，并最终构建出一个完整的企业级系统。</p>
+  </section>
+
+  <h2 class="stage">第一阶段：项目导论与系统蓝图（3 课时）</h2>
+  <div class="lesson">
+    <h3>第 1 课：项目背景与真实企业 AI 落地痛点</h3>
+    <p>介绍制造业财务分析场景，演示传统 BI 痛点，明确 ChatBI 要解决的核心问题。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 2 课：从“利润分析”到 AI 系统：三层能力拆解</h3>
+    <p>拆解 Query 理解、数据理解、分析能力三层架构，用真实案例说明为什么不能使用简单 Text2SQL 解决。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 3 课：企业级 ChatBI 系统架构设计与 MVP 范围定义</h3>
+    <p>讲解整体架构图，定义 MVP 边界，标注各模块输入输出，明确课程最终交付目标。</p>
+  </div>
+
+  <h2 class="stage">第二阶段：最小可运行系统 MVP（6 课时）</h2>
+  <div class="lesson">
+    <h3>第 4 课：从 0 搭建数据环境：制造业财务数据建模与 SQL 实战</h3>
+    <p>创建核心表并导入模拟数据，编写基础 SQL 验证数据模型正确性。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 5 课：让 LLM 第一次“说人话变 SQL”：Prompt 工程实战</h3>
+    <p>手写 few-shot prompt，注入 schema 信息，调用 LLM 生成 SQL 并执行验证。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 6 课：打通“问 → 查 → 答”：第一个可运行的 Text2SQL 系统</h3>
+    <p>整合 query 解析、SQL 生成、数据库执行、结果返回完整链路，产出首个 demo。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 7 课：为什么 SQL 总是错？真实错误案例拆解与修复</h3>
+    <p>分析字段选错、Join 错误、时间计算错误等典型案例，通过修改 prompt 修复问题。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 8 课：构建 SQL 生成评估体系：Execution Accuracy 实战</h3>
+    <p>设计测试用例集，编写评估脚本计算 execution accuracy，量化系统表现。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 9 课：引入指标知识：为什么“利润”算不对</h3>
+    <p>分析利润口径差异问题，构建简单指标定义表，为 RAG 做准备。</p>
+  </div>
+
+  <h2 class="stage">第三阶段：系统服务化与前端交互（3 课时）</h2>
+  <div class="lesson">
+    <h3>第 10 课：系统服务化改造：从脚本到 FastAPI 服务</h3>
+    <p>将 Text2SQL 脚本封装为 REST API，设计请求/响应结构，实现可调用服务。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 11 课：ChatBI 前端界面实战：构建可交互的对话页面</h3>
+    <p>搭建简单聊天界面，实现用户提问、系统返回结果、展示 SQL 和数据的完整交互。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 12 课：前后端联调与接口设计：让系统真正“可用”</h3>
+    <p>联调前端与 FastAPI 服务，处理异常情况和错误提示，完成第一个“能用的”ChatBI 系统。</p>
+  </div>
+
+  <h2 class="stage">第四阶段：让系统“理解业务”（Schema Linking + RAG）（8 课时）</h2>
+  <div class="lesson">
+    <h3>第 13 课：企业数据为什么难用？Schema Linking 问题剖析</h3>
+    <p>分析字段歧义、表选择困难等真实问题，理解 Schema Linking 的核心价值。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 14 课：表级召回实战：Embedding 相似度检索正确数据源</h3>
+    <p>实现基于 embedding 的表召回函数，用真实 query 测试召回准确率。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 15 课：字段语义匹配实战：解决“amount 到底是哪种金额”</h3>
+    <p>构建字段匹配逻辑，结合 embedding 相似度和业务规则，选出正确的字段。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 16 课：多表 Join 路径自动推理：让 SQL 不再乱连表</h3>
+    <p>实现基于外键关系的 join 路径自动推导，验证复杂查询的 join 正确性。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 17 课：Schema Linking 完整链路实现与效果评估</h3>
+    <p>整合表召回、字段匹配、join 推理，构建完整 Schema Linking 模块，对比优化前后 SQL 准确率。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 18 课：指标知识库构建实战：让 AI 理解利润 / 毛利 / ROI</h3>
+    <p>设计指标元数据结构，构建包含计算公式、业务定义、数据源的指标知识库。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 19 课：RAG + Text2SQL 融合：Prompt 注入指标知识</h3>
+    <p>实现指标检索与 prompt 注入，让 SQL 生成“算对利润”，对比 RAG 前后的生成质量。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 20 课：Schema Linking + RAG 综合优化与系统升级</h3>
+    <p>将 Schema Linking 和 RAG 整合到现有系统，完成完整优化链路，评估最终效果。</p>
+  </div>
+
+  <h2 class="stage">第五阶段：复杂分析能力（Agent）（6 课时）</h2>
+  <div class="lesson">
+    <h3>第 21 课：为什么一个 SQL 解决不了问题？复杂分析任务拆解</h3>
+    <p>以“利润下降原因”为例，拆解复杂分析任务的多步骤特性，对比单 SQL 与多步骤方案。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 22 课：从 0 实现 Query 拆解器：Task Decomposition 实战</h3>
+    <p>用 LLM 将复杂问题拆解为可执行的子任务列表，设计拆解 prompt 和输出格式。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 23 课：构建 Plan-and-Execute Agent 框架</h3>
+    <p>实现 Plan 生成、步骤执行、结果汇总的核心 Agent 框架，支持多步骤 SQL 执行。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 24 课：多 SQL 执行与中间结果管理</h3>
+    <p>实现步骤间数据传递，管理中间查询结果，确保多步骤执行的连贯性。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 25 课：结果总结与自动分析报告生成</h3>
+    <p>基于多步骤执行结果，用 LLM 生成结构化分析报告，包含数据洞察和行动建议。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 26 课：复杂案例完整实战：利润下降原因分析系统</h3>
+    <p>端到端实现“利润下降原因分析”完整流程，从 query 输入到报告输出，验证 Agent 效果。</p>
+  </div>
+
+  <h2 class="stage">第六阶段：工程化与企业落地（4 课时）</h2>
+  <div class="lesson">
+    <h3>第 27 课：权限与安全设计：企业数据为什么不能随便查</h3>
+    <p>设计数据权限控制方案，实现行级 / 列级权限过滤，保障数据安全。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 28 课：SQL 错误处理与性能优化</h3>
+    <p>实现 SQL 执行异常捕获、超时处理、慢查询优化，提升系统稳定性。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 29 课：系统扩展与模块化设计：如何支撑更多数据源</h3>
+    <p>设计可扩展架构，支持新增数据源、指标、业务规则，降低维护成本。</p>
+  </div>
+  <div class="lesson">
+    <h3>第 30 课：项目复盘与简历包装：如何讲清你的企业 AI 项目</h3>
+    <p>回顾完整项目链路，提炼技术亮点、核心面试题清单，指导简历撰写和面试表达。</p>
+  </div>
+
+  <section class="summary">
+    <h2>课时结构一览</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>阶段</th>
+          <th>主题</th>
+          <th>课时</th>
+          <th>课次</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>一</td><td>项目导论与系统蓝图</td><td>3</td><td>第 1–3 课</td></tr>
+        <tr><td>二</td><td>最小可运行系统 MVP</td><td>6</td><td>第 4–9 课</td></tr>
+        <tr><td>三</td><td>系统服务化与前端交互</td><td>3</td><td>第 10–12 课</td></tr>
+        <tr><td>四</td><td>Schema Linking + RAG</td><td>8</td><td>第 13–20 课</td></tr>
+        <tr><td>五</td><td>复杂分析能力（Agent）</td><td>6</td><td>第 21–26 课</td></tr>
+        <tr><td>六</td><td>工程化与企业落地</td><td>4</td><td>第 27–30 课</td></tr>
+        <tr><td colspan="2">合计</td><td>30</td><td>30 课</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p class="footer">原文链接：https://k1dy9adkxea.feishu.cn/wiki/ZTxFwEjfEi3Adhk8aBZcSHLjnfc</p>
+</body>
+</html>
