@@ -11,6 +11,7 @@
 import json
 import re
 import sys
+from decimal import Decimal
 from typing import Generator
 from query_parser import QueryParser
 from prompt_builder import build_prompt
@@ -236,16 +237,14 @@ class ChatBISystem:
             })
 
 
-def _sse_event(event_type: str, data: dict) -> str:
-    """构造 SSE 格式的事件字符串"""
-    return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False, default=_json_serializer)}\n\n"
-
-
 def _json_serializer(obj):
     """JSON 序列化补充：处理 Decimal 等非标准类型"""
     if isinstance(obj, Decimal):
         return float(obj)
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+def _sse_event(event_type: str, data: dict) -> str:
+    """构造 SSE 格式的事件字符串"""
+    return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False, default=_json_serializer)}\n\n"
 
 
 def main():

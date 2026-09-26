@@ -78,6 +78,12 @@ class LLMClient:
             stream=True,
         )
         for chunk in stream:
-            delta_content =chunk.choices[0].delta.content
+            if not chunk.choices:
+                continue
+            delta =chunk.choices[0].delta
+            delta_content=delta_content if delta and delta_content is not None else None
             if delta_content is not None:
                 yield delta_content
+if __name__=="__main__":
+    llm=LLMClient()
+    print(llm.generate_sql(system_msg='你是一个SQL生成器',prompt="查询学生数量"))
