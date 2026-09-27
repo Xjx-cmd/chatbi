@@ -310,3 +310,204 @@ if __name__ == "__main__":
         dynamic_tokens = len(result["dynamic_schema"]) // 2  # 粗略估算：2字符≈1token
         savings = (1 - dynamic_tokens / full_schema_tokens) * 100
         print(f"  {question[:20]}... → ~{dynamic_tokens} tokens (节省 {savings:.0f}%)")
+
+"""
+============================================================
+Schema Linking 完整链路演示
+============================================================
+
+--- 初始化向量索引 ---
+检查向量索引状态...
+正在处理批次 1, 文本数量:9
+索引构建完成：9张表已写入ChromaDB
+持久化路径：e:\Users\徐继璇\Desktop\Ai\chatBI\chatbi\chroma_db\tables
+字段索引已存在（40条)，跳过重建。如需重建请传入force_rebuild=Ture
+索引就绪。
+
+============================================================
+问题：按客户类型统计各产品线的收入，需要换算成人民币
+------------------------------------------------------------
+召回：3 张表, 12 个字段, 2 个 Join
+锚表：sales_orders
+
+动态 Schema（注入 Prompt）：
+----------------------------------------
+表：exchange_rates（参考表）
+  - rate_to_cny 兑人民币汇率，DECIMAL(10,4) ★强制包含
+  - currency 币种代码，VARCHAR(10) ★强制包含
+  - rate_date 汇率日期，DATE 类型 ★强制包含
+
+表：sales_orders（事实表） [锚表]
+  - net_amount 不含税收入（财务口径的销售额），DECIMAL(12,2) ★强制包含
+  - order_status 订单状态，VARCHAR(20) ★强制包含
+  - currency 订单币种，VARCHAR(10)
+  - region 订单销售区域（冗余字段），VARCHAR(50)
+  - quantity 订单数量，DECIMAL(10,2)
+
+表：dim_customers（维度表）
+  - industry 客户所属行业，VARCHAR(50)
+  - customer_type 客户类型分类，VARCHAR(50)
+  - region 客户所属的销售大区，VARCHAR(50)
+  - customer_name 客户名称，VARCHAR(100)
+
+表间关联：
+  LEFT JOIN exchange_rates ON sales_orders.order_date = exchange_rates.rate_date AND sales_orders.currency = exchange_rates.currency
+  JOIN dim_customers ON sales_orders.customer_id = dim_customers.customer_id
+----------------------------------------
+
+Join SQL 片段：
+  sales_orders
+  JOIN dim_customers ON sales_orders.customer_id = dim_customers.customer_id
+  LEFT JOIN exchange_rates ON sales_orders.order_date = exchange_rates.rate_date AND sales_orders.currency = exchange_rates.currency
+
+============================================================
+问题：各产品线的毛利率
+------------------------------------------------------------
+召回：3 张表, 12 个字段, 1 个 Join
+锚表：sales_orders
+
+动态 Schema（注入 Prompt）：
+----------------------------------------
+表：dim_products（维度表）
+  - material_cost 材料成本，DECIMAL(10,2) ★强制包含
+  - labor_cost 人工成本，DECIMAL(10,2) ★强制包含
+  - product_line 产品线分类，VARCHAR(50)
+  - category 产品分类（细分品类），VARCHAR(50)
+  - standard_cost 产品标准成本，DECIMAL(10,2)
+  - product_name 产品名称，VARCHAR(100)
+  - tech_route 技术路线，VARCHAR(50)
+
+表：sales_orders（事实表） [锚表]
+  - net_amount 不含税收入（财务口径的销售额），DECIMAL(12,2)
+  - unit_price 单价（不含税），DECIMAL(10,2)
+
+表：finance_expenses（事实表）
+  - selling_expense 销售费用（总项），DECIMAL(12,2)
+  - logistics_expense 物流费用，DECIMAL(12,2)
+  - rd_expense 研发费用，DECIMAL(12,2)
+
+表间关联：
+  JOIN dim_products ON sales_orders.product_id = dim_products.product_id
+
+注意：以下表与其他表无直接关联，需独立查询：['finance_expenses']
+----------------------------------------
+
+Join SQL 片段：
+  sales_orders
+  JOIN dim_products ON sales_orders.product_id = dim_products.product_id
+
+============================================================
+问题：上个月的研发费用和销售费用对比
+------------------------------------------------------------
+召回：3 张表, 12 个字段, 0 个 Join
+锚表：finance_expenses
+
+动态 Schema（注入 Prompt）：
+----------------------------------------
+表：finance_expenses（事实表） [锚表]
+  - selling_expense 销售费用（总项），DECIMAL(12,2)
+  - rd_expense 研发费用，DECIMAL(12,2)
+  - marketing_expense 市场费用，DECIMAL(12,2)
+  - logistics_expense 物流费用，DECIMAL(12,2)
+  - warranty_expense 质保费用，DECIMAL(12,2)
+  - finance_expense 财务费用，DECIMAL(12,2)
+  - department 部门名称，VARCHAR(50)
+  - admin_expense 管理费用，DECIMAL(12,2)
+  - expense_date 费用日期，DATE 类型
+
+表：sales_orders（事实表）
+  - net_amount 不含税收入（财务口径的销售额），DECIMAL(12,2)
+  - gross_amount 含税总额，DECIMAL(12,2)
+  - unit_price 单价（不含税），DECIMAL(10,2)
+
+表：exchange_rates（参考表）
+  （未匹配到特定字段，参考全部字段）
+
+注意：以下表与其他表无直接关联，需独立查询：['sales_orders', 'exchange_rates']
+----------------------------------------
+
+Join SQL 片段：
+  finance_expenses
+
+============================================================
+问题：查询德国客户的订单总额
+------------------------------------------------------------
+召回：3 张表, 12 个字段, 2 个 Join
+锚表：sales_orders
+
+动态 Schema（注入 Prompt）：
+----------------------------------------
+表：sales_orders（事实表） [锚表]
+  - gross_amount 含税总额，DECIMAL(12,2)
+  - currency 订单币种，VARCHAR(10)
+  - net_amount 不含税收入（财务口径的销售额），DECIMAL(12,2)
+  - region 订单销售区域（冗余字段），VARCHAR(50)
+  - quantity 订单数量，DECIMAL(10,2)
+  - order_status 订单状态，VARCHAR(20)
+  - order_date 订单日期，DATE 类型
+  - discount_amount 折扣金额，DECIMAL(10,2)
+
+表：dim_customers（维度表）
+  - customer_name 客户名称，VARCHAR(100)
+  - industry 客户所属行业，VARCHAR(50)
+  - country 客户所在的具体国家，VARCHAR(50)
+  - region 客户所属的销售大区，VARCHAR(50)
+
+表：exchange_rates（参考表）
+  （未匹配到特定字段，参考全部字段）
+
+表间关联：
+  LEFT JOIN exchange_rates ON sales_orders.order_date = exchange_rates.rate_date AND sales_orders.currency = exchange_rates.currency
+  JOIN dim_customers ON sales_orders.customer_id = dim_customers.customer_id
+----------------------------------------
+
+Join SQL 片段：
+  sales_orders
+  JOIN dim_customers ON sales_orders.customer_id = dim_customers.customer_id
+  LEFT JOIN exchange_rates ON sales_orders.order_date = exchange_rates.rate_date AND sales_orders.currency = exchange_rates.currency
+
+============================================================
+问题：哪些客户没有下过订单
+------------------------------------------------------------
+召回：3 张表, 12 个字段, 1 个 Join
+锚表：dim_customers
+
+动态 Schema（注入 Prompt）：
+----------------------------------------
+表：dim_customers（维度表） [锚表]
+  - customer_name 客户名称，VARCHAR(100)
+  - customer_type 客户类型分类，VARCHAR(50)
+  - industry 客户所属行业，VARCHAR(50)
+  - customer_id 客户唯一标识（主键），INT 类型
+  - region 客户所属的销售大区，VARCHAR(50)
+  - country 客户所在的具体国家，VARCHAR(50)
+
+表：sales_orders（事实表）
+  - order_status 订单状态，VARCHAR(20)
+  - region 订单销售区域（冗余字段），VARCHAR(50)
+  - customer_id 客户外键，INT
+  - order_no 订单编号，VARCHAR(50)
+  - quantity 订单数量，DECIMAL(10,2)
+  - order_date 订单日期，DATE 类型
+
+表：legal_contract_archive（法务系统）
+  （未匹配到特定字段，参考全部字段）
+
+表间关联：
+  LEFT JOIN sales_orders ON dim_customers.customer_id = sales_orders.customer_id
+
+注意：以下表与其他表无直接关联，需独立查询：['legal_contract_archive']
+----------------------------------------
+
+Join SQL 片段：
+  dim_customers
+  LEFT JOIN sales_orders ON dim_customers.customer_id = sales_orders.customer_id
+
+
+============================================================
+Token 消耗对比（粗略估算）
+============================================================
+  按客户类型统计各产品线的收入，需要换算成... → ~362 tokens (节省 76%)
+  各产品线的毛利率... → ~327 tokens (节省 78%)
+  上个月的研发费用和销售费用对比... → ~302 tokens (节省 80%)
+"""

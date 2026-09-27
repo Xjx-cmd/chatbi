@@ -359,3 +359,56 @@ if __name__ == "__main__":
             for line in result["sql_fragment"].split("\n"):
                 print(f"  {line}")
 
+"""
+======================================================================
+多表 Join 路径自动推理演示
+======================================================================
+
+问题：按客户类型统计收入
+候选表：['sales_orders', 'dim_customers']
+锚表：sales_orders（问题询问指标，在事实表中选择最相关的 'sales_orders' 作为锚表）
+生成 SQL 片段：
+  sales_orders
+  JOIN dim_customers ON sales_orders.customer_id = dim_customers.customer_id
+
+问题：列出所有客户
+候选表：['dim_customers']
+锚表：dim_customers（仅有一张候选表）
+生成 SQL 片段：
+  dim_customers
+
+问题：哪些客户没有下过订单
+候选表：['dim_customers', 'sales_orders']
+锚表：dim_customers（问题询问实体，在维度/参考表中选择最相关的 'dim_customers' 作为锚表）
+生成 SQL 片段：
+  dim_customers
+  LEFT JOIN sales_orders ON dim_customers.customer_id = sales_orders.customer_id
+
+问题：各产品线的毛利率
+候选表：['sales_orders', 'dim_products']
+锚表：sales_orders（问题询问指标，在事实表中选择最相关的 'sales_orders' 作为锚表）
+生成 SQL 片段：
+  sales_orders
+  JOIN dim_products ON sales_orders.product_id = dim_products.product_id
+
+问题：上个月的研发费用
+候选表：['finance_expenses']
+锚表：finance_expenses（仅有一张候选表）
+生成 SQL 片段：
+  finance_expenses
+
+问题：按客户类型统计各产品线的收入，需要换算成人民币
+候选表：['sales_orders', 'dim_customers', 'dim_products', 'exchange_rates']
+锚表：sales_orders（问题询问指标，在事实表中选择最相关的 'sales_orders' 作为锚表）
+生成 SQL 片段：
+  sales_orders
+  JOIN dim_products ON sales_orders.product_id = dim_products.product_id
+  JOIN dim_customers ON sales_orders.customer_id = dim_customers.customer_id
+  LEFT JOIN exchange_rates ON sales_orders.order_date = exchange_rates.rate_date AND sales_orders.currency = exchange_rates.currency
+
+问题：销售收入和期间费用对比
+候选表：['sales_orders', 'finance_expenses']
+锚表：sales_orders（问题询问指标，在事实表中选择最相关的 'sales_orders' 作为锚表）
+⚠ 无法连通的表：['finance_expenses']
+  这些表需要独立查询，不能通过 Join 关联
+"""

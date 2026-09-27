@@ -26,3 +26,8 @@ default = true
 members = [
     "chatbi-mvp",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

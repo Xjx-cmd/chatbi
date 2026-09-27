@@ -824,3 +824,79 @@ if __name__ == "__main__":
             print(f"  强制包含：{rules['force_include']}")
         if rules["force_exclude"]:
             print(f"  强制排除：{rules['force_exclude']}")
+
+"""
+============================================================
+字段语义匹配演示（向量相似度 + 业务规则混合匹配）
+============================================================
+
+--- 构建字段向量索引 ---
+正在处理批次 1, 文本数量:10
+正在处理批次 2, 文本数量:10
+正在处理批次 3, 文本数量:10
+正在处理批次 4, 文本数量:10
+字段索引构建完成：40 个字段已写入 ChromaDB
+持久化路径：e:\Users\徐继璇\Desktop\Ai\chatBI\chatbi\chroma_db\fields
+
+--- 字段匹配测试 ---
+
+==================================================
+问题：查询上个月各大区的销售额
+关注点：应选 net_amount 而非 gross_amount，应选 region 而非 country
+--------------------------------------------------
+召回表：[]
+匹配字段（Top-5）：
+  sales_orders.net_amount                  总分:0.702 向量:0.574 [强制包含]
+  sales_orders.order_status                总分:0.677 向量:0.539 [强制包含]
+  dim_customers.region                     总分:0.471 向量:0.673
+  sales_orders.region                      总分:0.439 向量:0.626
+  finance_expenses.selling_expense         总分:0.390 向量:0.558
+
+精简Schema:
+  （未召回相关表）
+
+==================================================
+问题：各产品线的毛利率
+关注点：应包含 net_amount + material_cost + labor_cost + quantity
+--------------------------------------------------
+召回表：[]
+匹配字段（Top-5）：
+  dim_products.material_cost               总分:0.697 向量:0.567 [强制包含]
+  dim_products.labor_cost                  总分:0.685 向量:0.549 [强制包含]
+  dim_products.product_line                总分:0.434 向量:0.620
+  dim_products.category                    总分:0.368 向量:0.526
+  sales_orders.net_amount                  总分:0.362 向量:0.517
+
+精简Schema:
+  （未召回相关表）
+
+==================================================
+问题：按客户类型统计含税收入
+关注点：明确说含税，应选 gross_amount
+--------------------------------------------------
+召回表：[]
+匹配字段（Top-5）：
+  sales_orders.net_amount                  总分:0.816 向量:0.738 [强制包含]
+  sales_orders.gross_amount                总分:0.783 向量:0.690 [强制包含]
+  sales_orders.order_status                总分:0.684 向量:0.549 [强制包含]
+  dim_customers.industry                   总分:0.508 向量:0.726
+  dim_customers.customer_type              总分:0.463 向量:0.662
+
+精简Schema:
+  （未召回相关表）
+
+
+============================================================
+业务规则评估演示
+============================================================
+
+问题：查询各大区的销售额
+  强制包含：['sales_orders.order_status', 'sales_orders.net_amount']
+  强制排除：['sales_orders.gross_amount']
+
+问题：含税收入统计
+  强制包含：['sales_orders.gross_amount', 'sales_orders.order_status', 'sales_orders.net_amount']
+
+问题：利润和成本分析
+  强制包含：['dim_products.material_cost', 'dim_products.labor_cost']
+"""
