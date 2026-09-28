@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import re
 
 # ----------------------路径处理----------------------
 # __file__ 当前测试脚本的完整路径
@@ -10,12 +11,100 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # 从上层模块导入4个核心类，也就是我们前面学习Plan‑and‑Execute Agent骨架
+# 导入核心类，TempTableResultStore就是24课新增中间结果存储组件
 from agent_planner import (
-    PlanAndExecuteAgent,   # Agent总入口
-    PlanGenerator,         # Planner：计划生成器
-    ResultSummarizer,      # Summarizer：结果汇总
-    StepExecutor,          # Executor：步骤执行器
+    PlanAndExecuteAgent,
+    PlanGenerator,
+    ResultSummarizer,
+    StepExecutor,
+    TempTableResultStore,
 )
+
+# ===================== Mock 模拟MySQL临时表环境（单元测试，不需要真实MySQL） =====================
+class FakeTempCursor:
+    """模拟MySQL cursor游标对象，拦截execute执行的SQL，内存模拟临时表行为
+    支持：DROP TEMPORARY TABLE、CREATE TEMPORARY TABLE、SELECT * FROM 临时表
+    """
+    def __init__(self, connection):
+        self.connection = connection   # 持有上层连接对象FakeTempConnection
+        self.description = None        # 模拟cursor.description 返回列元信息
+        self._results = []              # 模拟fetchall返回的行数据
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql, params=None):
+        """拦截SQL，正则解析表名、字段，内存字典模拟表"""
+        self.connection.executed.append((sql, params))
+        sql_upper = " ".join(sql.upper().split())
+        # 正则提取反引号 ``包裹的标识符：表名、字段名
+        identifiers = re.findall(r"`([^`]+)`", sql)
+
+        # 1. 删除临时表 DROP TEMPORARY TABLE IF EXISTS
+        if sql_upper.startswith("DROP TEMPORARY TABLE IF EXISTS"):
+            table_name = identifiers[0]
+            self.connection.tables.pop(table_name, None)
+            self.description = None
+            self._results = []
+            return
+
+        # 2. 创建临时表 CREATE TEMPORARY TABLE
+        if sql_upper.startswith("CREATE TEMPORARY TABLE"):
+            table_name = identifiers[0]
+            columns = identifiers[1:]
+            # 在connection内存字典登记表：{表名: {"columns":[列], "rows":[行数据]}}
+            self.connection.tables[table_name] = {"columns": columns, "rows": []}
+            self.description = None
+            self._results = []
+            return
+
+        # 3. 查询临时表 SELECT * FROM `xxx`
+        if sql_upper.startswith("SELECT * FROM"):
+            table_name = identifiers[0]
+            table = self.connection.tables[table_name]
+            columns = table["columns"]
+            rows = table["rows"]
+            # 模拟cursor.description，mysql返回的列元组格式
+            self.description = [(column,) for column in columns]
+            # 把dict行转为数据库原生tuple格式
+            self._results = [tuple(row.get(column) for column in columns) for row in rows]
+            return
+
+        raise AssertionError(f"未处理的 SQL: {sql}")
+
+    def executemany(self, sql, params_seq):
+        """批量插入数据，对应 INSERT INTO ... VALUES (...),(...)"""
+        params_list = list(params_seq)
+        self.connection.executed.append((sql, params_list))
+        identifiers = re.findall(r"`([^`]+)`", sql)
+        table_name = identifiers[0]
+        columns = identifiers[1:]
+        table = self.connection.tables[table_name]
+        # 将插入参数转为字典存入内存表rows
+        table["rows"].extend(dict(zip(columns, params)) for params in params_list)
+
+    def fetchall(self):
+        """模拟获取查询结果"""
+        return self._results
+
+class FakeTempConnection:
+    """模拟MySQL连接对象"""
+    def __init__(self):
+        self.tables = {}          # 内存存储所有临时表
+        self.executed = []        # 记录全部执行过的sql，用于断言校验
+        self.open = True          # 标记连接是否打开
+
+    def cursor(self):
+        return FakeTempCursor(self)
+
+    def commit(self):
+        self.executed.append(("COMMIT", None))
+
+    def close(self):
+        self.open = False
 
 def sample_decomposition() -> dict:
     """
@@ -208,4 +297,206 @@ def test_agent_returns_summary_after_execution():
     返回完整result字典，执行assert断言校验摘要字段
 
     """
+
+# ===================== 【第24课新增测试用例：中间结果管理】 =====================
+def test_step_executor_retries_failed_step_and_records_result_reference():
+    """
+    测试点：步骤失败自动重试 + 生成中间结果引用 result_reference
+    参数说明（StepExecutor新增入参，24课）
+    - max_retries=1：最大重试1次
+    - failure_policy="abort"：失败策略abort：本步骤重试耗尽失败后，直接终止整个执行
+    - storage_backend="memory"：存储后端使用内存存储中间结果
+    """
+    decomposition = sample_decomposition()
+    plan = PlanGenerator().build_plan("最近三个月利润为什么下降？", decomposition)
+    attempts = {"step_1": 0}
+
+    def flaky_runner(question: str) -> dict:
+        """模拟不稳定任务：step_1第一次执行失败，第2次（重试）执行成功"""
+        primary_instruction = question.splitlines()[0]
+        if "查看最近三个月利润趋势" in primary_instruction:
+            attempts["step_1"] += 1
+            if attempts["step_1"] == 1:
+                # 第一次返回失败
+                return {
+                    "success": False,
+                    "error": "数据库连接超时",
+                    "formatted": "第一次执行失败",
+                }
+        # 重试之后返回成功
+        return {
+            "success": True,
+            "sql": "SELECT 1",
+            "columns": ["value"],
+            "rows": [{"value": 1}],
+            "formatted": "重试后执行成功",
+        }
+
+    executor = StepExecutor(
+        step_runner=flaky_runner,
+        max_retries=1,
+        failure_policy="abort",
+        storage_backend="memory",
+    )
+    results = executor.execute_plan(plan)
+
+    # 断言：总共尝试2次：第1次失败，重试1次成功
+    assert attempts["step_1"] == 2
+    assert results[0].success is True
+    assert results[0].attempts == 2          # StepExecutionResult新增字段attempts记录执行次数
+    assert results[0].status == "completed"  # 状态：completed / failed / skipped
+    # 生成内存中间结果引用地址
+    assert results[0].result_reference == "memory://step_1"
+
+def test_step_executor_skips_downstream_steps_after_failed_dependency():
+    """
+    测试点：failure_policy="skip"策略
+    当前步骤执行失败，则**所有依赖它的下游步骤标记为 skipped，不执行runner**
+    step_1执行失败；step_2依赖step_1 → skipped；step_3依赖step_2 → skipped
+    """
+    decomposition = sample_decomposition()
+    plan = PlanGenerator().build_plan("最近三个月利润为什么下降？", decomposition)
+
+    def failing_runner(question: str) -> dict:
+        primary_instruction = question.splitlines()[0]
+        if "查看最近三个月利润趋势" in primary_instruction:
+            # 第一步直接失败，无重试 max_retries=0
+            return {
+                "success": False,
+                "error": "SQL 语法错误",
+                "formatted": "首步失败",
+            }
+        return {
+            "success": True,
+            "sql": "SELECT 1",
+            "columns": ["value"],
+            "rows": [{"value": 1}],
+            "formatted": "后续不应执行到这里",
+        }
+
+    executor = StepExecutor(
+        step_runner=failing_runner,
+        max_retries=0,
+        failure_policy="skip",
+    )
+    results = executor.execute_plan(plan)
+
+    assert results[0].status == "failed"
+    assert results[1].status == "skipped"
+    assert results[1].success is False
+    assert "依赖步骤失败" in results[1].error
+    assert results[2].status == "skipped"
+
+def test_result_summarizer_counts_skipped_steps_separately():
+    """
+    测试点：ResultSummarizer新增skipped_steps计数
+    区分三类状态：completed(成功) / failed(失败) / skipped(跳过)
+    step1 failed；step2、step3 skipped
+    completed_steps=0, failed_steps=1, skipped_steps=2
+    """
+    decomposition = sample_decomposition()
+    plan = PlanGenerator().build_plan("最近三个月利润为什么下降？", decomposition)
+
+    def failing_runner(question: str) -> dict:
+        primary_instruction = question.splitlines()[0]
+        if "查看最近三个月利润趋势" in primary_instruction:
+            return {
+                "success": False,
+                "error": "SQL 语法错误",
+                "formatted": "首步失败",
+            }
+        return {
+            "success": True,
+            "sql": "SELECT 1",
+            "columns": ["value"],
+            "rows": [{"value": 1}],
+            "formatted": "后续不应执行到这里",
+        }
+
+    executor = StepExecutor(step_runner=failing_runner, failure_policy="skip")
+    step_results = executor.execute_plan(plan)
+    summary = ResultSummarizer().summarize(
+        original_question="最近三个月利润为什么下降？",
+        plan=plan,
+        step_results=step_results,
+    )
+
+    assert summary.completed_steps == 0
+    assert summary.failed_steps == 1
+    assert summary.skipped_steps == 2
+
+def test_temp_table_result_store_put_get_and_cleanup():
+    """
+    测试 TempTableResultStore：MySQL临时表存储中间结果
+    put：把步骤输出columns+rows写入临时表，返回result_reference
+    get：通过reference读取数据
+    cleanup：关闭连接、删除临时表资源释放
+    reference格式：temp_table://tmp_agent_step_1
+    """
+    fake_connection = FakeTempConnection()
+    store = TempTableResultStore(connection_factory=lambda: fake_connection)
+
+    # 存入中间结果
+    reference = store.put(
+        step_id="step_1",
+        columns=["month", "profit"],
+        rows=[{"month": "2026-05", "profit": 920000}],
+    )
+    # 根据引用取出数据
+    loaded_rows = store.get(reference)
+
+    assert reference == "temp_table://tmp_agent_step_1"
+    assert loaded_rows == [{"month": "2026-05", "profit": 920000}]
+
+    # 资源清理：删除临时表，关闭连接
+    store.cleanup()
+
+    assert fake_connection.open is False
+    assert fake_connection.tables == {}
+
+def test_step_executor_can_load_rows_from_temp_table_reference():
+    """
+    测试Executor完整链路使用temp_table存储后端：
+    1.step_1执行完成，结果存入MySQL临时表，产出 result_reference
+    2.下游step_2执行时，Executor根据result_reference调用get_intermediate_result拿到原始结构化数据
+    > 课程意义：解决第26课之前旧版本缺陷：不再把大段文本摘要塞到prompt，可读取原始结构化中间结果
+    """
+    decomposition = sample_decomposition()
+    plan = PlanGenerator().build_plan("最近三个月利润为什么下降？", decomposition)
+    fake_connection = FakeTempConnection()
+    captured_questions: list[str] = []
+
+    def runner(question: str) -> dict:
+        captured_questions.append(question)
+        primary_instruction = question.splitlines()[0]
+        if "查看最近三个月利润趋势" in primary_instruction:
+            return {
+                "success": True,
+                "sql": "SELECT month, profit FROM profit_trend",
+                "columns": ["month", "profit"],
+                "rows": [{"month": "2026-05", "profit": 920000}],
+                "formatted": "",
+            }
+
+        return {
+            "success": True,
+            "sql": "SELECT 1",
+            "columns": ["value"],
+            "rows": [{"value": 1}],
+            "formatted": "后续执行成功",
+        }
+
+    executor = StepExecutor(
+        step_runner=runner,
+        storage_backend="temp_table",
+        storage_connection_factory=lambda: fake_connection,
+    )
+    results = executor.execute_plan(plan, max_steps=2)
+    # 通过reference读取中间结果
+    loaded_rows = executor.get_intermediate_result(results[0].result_reference)
+
+    assert results[0].result_reference == "temp_table://tmp_agent_step_1"
+    assert loaded_rows == [{"month": "2026-05", "profit": 920000}]
+    # 下游question中带上结构化的行数据
+    assert '{"month": "2026-05", "profit": 920000}' in captured_questions[1]  
 
