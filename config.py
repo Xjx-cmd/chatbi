@@ -28,5 +28,5 @@ LLM_CONFIG = {
     "model": os.getenv("LLM_MODEL", "qwen-plus"),
     "embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-v4"),
     "temperature": 0.1,
-    "max_tokens": 1000
+    "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 4000))
 }
