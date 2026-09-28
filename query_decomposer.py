@@ -146,7 +146,8 @@ if __name__ == "__main__":
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
-"""LLM 原始输出: 
+"""
+LLM 原始输出: 
 {
   "question_type": "trend_analysis",
   "analysis_goal": "识别导致最近三个月利润下降的关键驱动因素",
@@ -294,4 +295,5 @@ question_type='trend_analysis' analysis_goal='识别导致最近三个月利润�
       ]
     }
   ]
-}"""
+}
+"""
