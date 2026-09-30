@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from indicator_knowledge import IndicatorKnowledge
 
 from main import ChatBISystem
+from security import UserContext
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,6 +96,9 @@ class QueryRequest(BaseModel):
     use_indicator_knowledge: bool = Field(default=True, description="是否注入指标知识")
     use_schema_linking: bool = Field(default=False, description="是否启用 Schema Linking")
     use_indicator_rag: bool = Field(default=False, description="是否启用指标 RAG")
+    user_id: str | None = Field(default=None, description="用户 ID，可选；未传时优先走请求头")
+    user_role: str | None = Field(default=None, description="用户角色：admin / finance / sales")
+    user_region: str | None = Field(default=None, description="用户所属区域，行级权限过滤")
 
 class HealthResponse(BaseModel):
     """健康检查响应"""
@@ -124,6 +128,24 @@ class ErrorResponse(BaseModel):
 def _rows_to_dicts(columns: list[str], results: list[tuple]) -> list[dict[str, Any]]:
     """将数据库元组结果转换为 JSON 可直接返回的字典列表"""
     return [dict(zip(columns, row)) for row in results]
+
+def _build_user_context(request: Request, payload: QueryRequest) -> UserContext:
+    state_context = getattr(request.state, "user_context", UserContext.demo_admin())
+    return UserContext(
+        user_id=payload.user_id or state_context.user_id,
+        role=payload.user_role or state_context.role,
+        region=payload.user_region or state_context.region,
+    )
+@app.middleware("http")
+async def attach_user_context(request: Request, call_next):
+    """把最小权限上下文挂到 request.state，供查询链路复用。"""
+    request.state.user_context = UserContext(
+        user_id=request.headers.get("x-user-id", "demo_admin"),
+        role=request.headers.get("x-user-role", "admin"),
+        region=request.headers.get("x-user-region"),
+    )
+    return await call_next(request)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
@@ -201,10 +223,11 @@ def health_check() -> HealthResponse:
         500: {"model": ErrorResponse, "description": "数据库或服务内部异常"},
     },
 )
-def query_chatbi(payload: QueryRequest) -> QuerySuccessResponse:
-    """执行自然语言查询，并返回标准化结果"""
+def query_chatbi(payload: QueryRequest, request: Request) -> QuerySuccessResponse:
+    """执行自然语言查询，并返回标准化结果（同步，一次性返回）"""
     started_at = perf_counter()
     logger.info("Received question: %s", payload.question)
+    user_context = _build_user_context(request, payload)
 
     result = system.run(
         user_question=payload.question,
@@ -214,6 +237,7 @@ def query_chatbi(payload: QueryRequest) -> QuerySuccessResponse:
         use_indicator_knowledge=payload.use_indicator_knowledge,
         use_schema_linking=payload.use_schema_linking,
         use_indicator_rag=payload.use_indicator_rag,
+        security_context=user_context,
     )
 
     duration_ms = round((perf_counter() - started_at) * 1000, 2)
@@ -225,6 +249,8 @@ def query_chatbi(payload: QueryRequest) -> QuerySuccessResponse:
             status_code = 400
         elif error_type == "llm":
             status_code = 502
+        elif error_type == "security":
+            status_code = 403
         raise HTTPException(status_code=status_code, detail=result["error"])
 
     metadata = {
@@ -242,7 +268,7 @@ def query_chatbi(payload: QueryRequest) -> QuerySuccessResponse:
         metadata=metadata,
     )
 @app.post("/api/v1/query/stream",tags=["查询"]，summary="SSE 流式查询（逐步推送）")
-async def query_chatbi_stream(payload: QueryRequest) -> StreamingResponse:
+async def query_chatbi_stream(payload: QueryRequest, request: Request) -> StreamingResponse:
     """
     执行自然语言查询，以 SSE 流式返回结果
 
@@ -257,6 +283,7 @@ async def query_chatbi_stream(payload: QueryRequest) -> StreamingResponse:
         data: <json>
     """
     logger.info("Stream request received: %s", payload.question)
+    user_context = _build_user_context(request, payload)
 
     def event_generator():
         for event_str in system.run_stream(
@@ -267,6 +294,7 @@ async def query_chatbi_stream(payload: QueryRequest) -> StreamingResponse:
             use_indicator_knowledge=payload.use_indicator_knowledge,
             use_schema_linking=payload.use_schema_linking,
             use_indicator_rag=payload.use_indicator_rag,
+            security_context=user_context,
         ):
             yield event_str
 
