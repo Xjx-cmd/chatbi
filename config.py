@@ -31,7 +31,7 @@ DB_RUNTIME_CONFIG = {
     "slow_query_threshold_ms": float(os.getenv("DB_SLOW_QUERY_THRESHOLD_MS", 200)),
 }
 
-# ==================== LLM 配置 ====================
+# ++==================== LLM 配置 ====================
 LLM_CONFIG = {
     "api_key": os.getenv("OPENAI_API_KEY"),
     "base_url": os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),

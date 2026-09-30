@@ -115,7 +115,7 @@ class DatabaseClient:
         # 加载数据库配置
         self.config = DB_CONFIG
         
-        # 安全管理器：外部传入则使用外部实例，否则新建QuerySecurityManager
+        # 111安全管理器：外部传入则使用外部实例，否则新建QuerySecurityManager
         self.security = security_manager or QuerySecurityManager()
 
         self.time_fn = time_fn or perf_counter
